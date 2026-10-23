@@ -377,6 +377,9 @@ struct TextureCounters {
     std::atomic<std::uint64_t> tablesResolved{0};
     std::atomic<std::uint64_t> tableWritesKept{0};
     std::atomic<std::uint64_t> tableWritesMade{0};
+    std::atomic<std::uint64_t> variantSurfaces{0};
+    std::atomic<std::uint64_t> variantSubstituted{0};
+    std::atomic<std::uint64_t> variantRejected{0};
     // Snapshot hits over memory outside the write watch: kept by an unchanged UntrackedHint key, or
     // by a byte compare.
     std::atomic<std::uint64_t> untrackedKept{0};
@@ -397,7 +400,7 @@ void reportTextureCounters() {
     auto last = counters.lastReport.load();
     if (nowMs - last < 10000 || !counters.lastReport.compare_exchange_strong(last, nowMs)) return;
     const auto count = [](const std::atomic<std::uint64_t>& value) { return static_cast<unsigned long long>(value.load(std::memory_order_relaxed)); };
-    AgcDriver::ProfilePrint_nid_no_patch("[textures] sampled created: %llu from storage images, %llu snapshots (%llu snapshot reads over recorded writes inside cachedTexture, %llu storage-path fallbacks); stage-A records %llu: %llu fast hits, %llu full lookups; storage images %llu hits, %llu created, %llu own-object refreshes; image tables %llu reused, %llu resolved; untracked snapshots %llu kept by the write-watch hint, %llu compared\n", count(counters.fromStorage), count(counters.snapshots), count(counters.pendingReads), count(counters.storageFallbacks), count(counters.records), count(counters.fastHits), count(counters.fastMisses), count(counters.storageHits), count(counters.storageCreated), count(counters.ownRefreshes), count(counters.tablesReused), count(counters.tablesResolved), count(counters.untrackedKept), count(counters.untrackedCompared));
+    AgcDriver::ProfilePrint_nid_no_patch("[textures] sampled created: %llu from storage images, %llu snapshots (%llu snapshot reads over recorded writes inside cachedTexture, %llu storage-path fallbacks); stage-A records %llu: %llu fast hits, %llu full lookups; storage images %llu hits, %llu created, %llu own-object refreshes; image tables %llu reused, %llu resolved; dynamic-resolution variants: %llu surfaces, %llu entries substituted, %llu entries rejected; untracked snapshots %llu kept by the write-watch hint, %llu compared\n", count(counters.fromStorage), count(counters.snapshots), count(counters.pendingReads), count(counters.storageFallbacks), count(counters.records), count(counters.fastHits), count(counters.fastMisses), count(counters.storageHits), count(counters.storageCreated), count(counters.ownRefreshes), count(counters.tablesReused), count(counters.tablesResolved), count(counters.variantSurfaces), count(counters.variantSubstituted), count(counters.variantRejected), count(counters.untrackedKept), count(counters.untrackedCompared));
 }
 
 // What the sampled-texture lookups on this thread proved their returned objects current against,
@@ -5022,6 +5025,17 @@ struct VariantSource {
     bool firstLayer;
 };
 
+void noteVariantSurface(std::uint64_t address, std::size_t members, const GuestTextureResource& chosen, const char* rule) {
+    static std::mutex mutex;
+    static std::unordered_set<std::uint64_t> seen;
+    {
+        std::lock_guard lock(mutex);
+        if (seen.size() >= 4096u || !seen.insert(address).second) return;
+    }
+    TextureCounts().variantSurfaces.fetch_add(1, std::memory_order_relaxed);
+    std::fprintf(stderr, "[textures] surface 0x%llx has %zu dynamic-resolution variants in one image table; they share the %ux%u texture (chosen by %s)\n", static_cast<unsigned long long>(address), members, chosen.width, chosen.height, rule);
+}
+
 std::vector<std::uint32_t> variantRepresentatives(VkDevice device, const ShaderRecompiler::DescriptorBinding& binding, std::uint64_t elementBase, std::uint64_t capacity) {
     struct Member {
         std::uint32_t element;
@@ -5051,11 +5065,14 @@ std::vector<std::uint32_t> variantRepresentatives(VkDevice device, const ShaderR
             return std::find_if(members.begin(), members.end(), [&](const Member& member) { return member.resource.width == width && member.resource.height == height; });
         };
         auto chosen = members.end();
+        const char* rule = "newest write";
         if (const auto record = StorageTexture::LastWrite(first.baseAddress); record && record->tileMode == first.tileMode && record->dimension == first.dimension && BytesPerElement(record->format) == BytesPerElement(first.format)) chosen = withExtent(record->width, record->height);
         if (chosen == members.end()) {
+            rule = "active depth surface";
             if (const auto depth = ActiveDepthExtent(device, first.baseAddress)) chosen = withExtent(depth->width, depth->height);
         }
         if (chosen == members.end()) {
+            rule = "largest accessible";
             std::uint64_t chosenBytes = 0;
             for (auto member = members.begin(); member != members.end(); ++member) {
                 try {
@@ -5073,6 +5090,7 @@ std::vector<std::uint32_t> variantRepresentatives(VkDevice device, const ShaderR
             if (binding.imageShapes.at(member.element) != binding.imageShapes.at(chosen->element) || binding.imageDepthCompare.at(member.element) != binding.imageDepthCompare.at(chosen->element)) continue;
             representatives[member.element] = chosen->element;
         }
+        noteVariantSurface(first.baseAddress, members.size(), chosen->resource, rule);
     }
     return representatives;
 }
@@ -5285,9 +5303,11 @@ void ShaderResources::resolveImageTables() {
             const auto source = representativeSources.find(representative);
             if (index == std::numeric_limits<std::size_t>::max() || source == representativeSources.end()) {
                 table.map[faults + element] = rejectTableElement(table, words, "the dynamic-resolution variant this entry borrows from was rejected");
+                counters.variantRejected.fetch_add(1, std::memory_order_relaxed);
                 continue;
             }
-            bind(element, words, textures[index], source->second.resource, source->second.guestBytes, source->second.firstLayer);
+            if (bind(element, words, textures[index], source->second.resource, source->second.guestBytes, source->second.firstLayer).empty()) counters.variantSubstituted.fetch_add(1, std::memory_order_relaxed);
+            else counters.variantRejected.fetch_add(1, std::memory_order_relaxed);
         }
         counters.tablesResolved.fetch_add(1, std::memory_order_relaxed);
         if (reusable && CurrentTableState() == state) {
@@ -5308,7 +5328,7 @@ void ShaderResources::resolveImageTables() {
 
 ImageTableReuseCounts ImageTableReuses() {
     const auto& counters = TextureCounts();
-    return {counters.tablesReused.load(std::memory_order_relaxed) + counters.tablesReplayed.load(std::memory_order_relaxed), counters.tablesResolved.load(std::memory_order_relaxed), counters.tablesReplayed.load(std::memory_order_relaxed), counters.tableWritesKept.load(std::memory_order_relaxed), counters.tableWritesMade.load(std::memory_order_relaxed)};
+    return {counters.tablesReused.load(std::memory_order_relaxed) + counters.tablesReplayed.load(std::memory_order_relaxed), counters.tablesResolved.load(std::memory_order_relaxed), counters.tablesReplayed.load(std::memory_order_relaxed), counters.tableWritesKept.load(std::memory_order_relaxed), counters.tableWritesMade.load(std::memory_order_relaxed), counters.variantSurfaces.load(std::memory_order_relaxed), counters.variantSubstituted.load(std::memory_order_relaxed), counters.variantRejected.load(std::memory_order_relaxed)};
 }
 
 void ShaderResources::finishImageTables() {
