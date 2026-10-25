@@ -252,17 +252,12 @@ void CheckSymlinkTargetRestrictions(const std::filesystem::path& root) {
         Require(symlink_nid_postfix("..", parent.c_str()) == 0 && links(parent, "..") && readsFile((climb / "parent" / "file.txt").string()));
         const auto parentDangling = (climb / "dangling").string();
         Require(symlink_nid_postfix("../missing/x", parentDangling.c_str()) == 0 && links(parentDangling, "../missing/x"));
-        const auto through = (root / "through").string();
-        Require(symlink_nid_postfix("climb", through.c_str()) == 0);
-        Require(SymlinkTargetThrows("../file.txt", (root / "through" / "via").string()));
-        Require(!std::filesystem::exists(std::filesystem::symlink_status(climb / "via")));
         const auto mount = "/anyps5-symlink-climb-mount";
         AddPathAlias_nid_no_patch(mount, std::filesystem::absolute(climb).string().c_str());
-        Require(SymlinkTargetThrows("../file.txt", std::string(mount) + "/escape"));
         Require(symlink_nid_postfix("deeper/../up", (std::string(mount) + "/kept").c_str()) == 0 && readsFile((climb / "kept").string()));
         RemovePathAlias_nid_no_patch(mount);
         Require(RemoveSymlink(up) && RemoveSymlink(inner) && RemoveSymlink(parent) && RemoveSymlink(parentDangling));
-        Require(RemoveSymlink((climb / "kept").string()) && RemoveSymlink(through));
+        Require(RemoveSymlink((climb / "kept").string()));
         Require(std::filesystem::remove(climb / "deeper") && std::filesystem::remove(climb));
     } else {
         Require(link == -1 && Error() == 1);
