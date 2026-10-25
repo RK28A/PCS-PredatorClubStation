@@ -257,6 +257,7 @@ GuestTextureResource DecodeTextureResource(std::span<const std::uint32_t> descri
                 Require(!IsBlockCompressed(format) && maxMip == 0 && baseArray == 0, "guest 2D linear texture descriptor sets a pitch on a block-compressed, mipmapped or base-array surface, which is not implemented" + describe());
                 const auto elementsPerPitchUnit = 256u / BytesPerElement(format);
                 const auto defaultPitch = (width + elementsPerPitchUnit - 1u) / elementsPerPitchUnit * elementsPerPitchUnit;
+                Require(!ShaderRecompiler::GcnGuestShaders() || depth + 1u == defaultPitch, "guest 2D linear texture descriptor of a PS4 guest sets a custom pitch other than its default pitch, which is not implemented" + describe());
                 const auto pitch = (std::max(depth + 1u, width) + elementsPerPitchUnit - 1u) / elementsPerPitchUnit * elementsPerPitchUnit;
                 linearPitch = pitch == defaultPitch ? 0u : pitch;
                 depth = 0;
