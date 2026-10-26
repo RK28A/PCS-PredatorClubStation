@@ -1195,7 +1195,7 @@ int APS5_VABI sceNetConnect(int s, const void* addr, uint32_t addrlen) {
 #ifndef _WIN32
     if (socket.type == NET_SOCK_STREAM && connectTimeout > 0 && !socket.native->nonblock) {
         const int error = connect_within(socket.native->value, reinterpret_cast<const sockaddr*>(&native), native_length, connectTimeout);
-        if (error == CONNECT_EXPIRED) NotImplemented_nid_no_patch(__func__);
+        if (error == CONNECT_EXPIRED) throw std::runtime_error("sceNetConnect: the connect timeout expired");
         if (error != 0) return fail(error);
 #ifdef __APPLE__
         note_local_address(s, socket);
@@ -1221,7 +1221,7 @@ int APS5_VABI sceNetConnect(int s, const void* addr, uint32_t addrlen) {
         timeval limit{connectTimeout / 1000000, connectTimeout % 1000000};
         const int ready = ::select(0, nullptr, &writable, &failed, connectTimeout > 0 ? &limit : nullptr);
         if (ready < 0) return fail(native_error());
-        if (ready == 0) NotImplemented_nid_no_patch(__func__);
+        if (ready == 0) throw std::runtime_error("sceNetConnect: the connect timeout expired");
         int error = 0;
         int size = sizeof(error);
         if (::getsockopt(socket.native->value, SOL_SOCKET, SO_ERROR, reinterpret_cast<char*>(&error), &size) != 0)
