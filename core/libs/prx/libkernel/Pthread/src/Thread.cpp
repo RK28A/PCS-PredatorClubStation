@@ -945,7 +945,7 @@ static void* StartNativeThread(void* opaque) {
         }
     } guard{self};
     const auto stackEnd = reinterpret_cast<std::uintptr_t>(self->stackAddress) + self->stackSize;
-    if (const auto frame = reinterpret_cast<std::uintptr_t>(&stackEnd); frame > stackEnd)
+    if (const auto frame = reinterpret_cast<std::uintptr_t>(__builtin_frame_address(0)); frame > stackEnd)
         static_cast<volatile unsigned char*>(alloca(frame - stackEnd))[0] = 0;
     std::jmp_buf exitJump;
     if (setjmp(exitJump) == 0) {
