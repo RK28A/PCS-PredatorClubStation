@@ -46,6 +46,7 @@ constexpr std::size_t BlockBytes = TexturesOffset + 2 * 65536;
 constexpr std::uint32_t Largest = 60;
 constexpr std::uint32_t Written = 61;
 constexpr std::uint32_t Depth = 62;
+constexpr std::uint32_t Sized = 59;
 
 alignas(256) std::array<std::uint32_t, Records> Keys{};
 alignas(256) std::array<std::uint32_t, Lanes * 4> Output{};
@@ -56,6 +57,18 @@ alignas(256) constexpr std::array<std::uint32_t, 28> TableCode{
     0x20000000u, 0x9312b011u, 0xf42c0802u, 0x24000000u, 0x360200bfu, 0x7e020d01u, 0x060202f0u, 0x100202ffu,
     0x3c800000u, 0x7e0402ffu, 0x3e000000u, 0xf09c8f08u, 0x01090401u, 0x7e120202u, 0x34101286u, 0x4a101100u,
     0x34101084u, 0xe0781000u, 0x80070408u, 0xbf810000u,
+};
+
+alignas(256) constexpr std::array<std::uint32_t, 23> FetchCode{
+    0xf4080100u, 0xfa000000u, 0xf4080200u, 0xfa000010u, 0xf4080700u, 0xfa000020u, 0x8f108202u, 0xf4200444u,
+    0x20000000u, 0x9312b011u, 0xf42c0802u, 0x24000000u, 0x360200bfu, 0x7e040280u, 0xf0008f08u, 0x00090401u,
+    0x7e120202u, 0x34101286u, 0x4a101100u, 0x34101084u, 0xe0781000u, 0x80070408u, 0xbf810000u,
+};
+
+alignas(256) constexpr std::array<std::uint32_t, 23> SizeCode{
+    0xf4080100u, 0xfa000000u, 0xf4080200u, 0xfa000010u, 0xf4080700u, 0xfa000020u, 0x8f108202u, 0xf4200444u,
+    0x20000000u, 0x9312b011u, 0xf42c0802u, 0x24000000u, 0x360200bfu, 0x7e040280u, 0xf0388308u, 0x00090402u,
+    0x7e120202u, 0x34101286u, 0x4a101100u, 0x34101084u, 0xe0781000u, 0x80070408u, 0xbf810000u,
 };
 
 alignas(256) constexpr std::array<std::uint32_t, 7> StoreCode{
@@ -163,10 +176,9 @@ void FillTable(const GuestBlock& block) {
     }
 }
 
-ShaderRecompiler::RecompileResult Compile(AgcDriver::VulkanDevice& device, const GuestBlock& table) {
+ShaderRecompiler::RecompileResult Compile(AgcDriver::VulkanDevice& device, const GuestBlock& table, std::span<const std::uint32_t> code = TableCode) {
     const auto srtAddress = AddressOf(Srt.data());
     const std::array<std::uint32_t, 2> userData{static_cast<std::uint32_t>(srtAddress), static_cast<std::uint32_t>(srtAddress >> 32u)};
-    const std::span<const std::uint32_t> code(TableCode);
     const std::span<const std::uint32_t> words(table.Table(), Records * Stride / 4u);
     const std::array<ShaderRecompiler::MemoryRegion, 4> memory{{
         {AddressOf(code.data()), std::as_bytes(code)},
@@ -206,10 +218,10 @@ void Store(AgcDriver::VulkanDevice& device, const float* texels, std::uint32_t w
     device.WaitIdle();
 }
 
-std::vector<std::uint32_t> Dispatch(AgcDriver::VulkanDevice& device, const ShaderRecompiler::RecompileResult& result, std::uint32_t record) {
+std::vector<std::uint32_t> Dispatch(AgcDriver::VulkanDevice& device, const ShaderRecompiler::RecompileResult& result, std::uint32_t record, const void* code = TableCode.data()) {
     Keys[0] = record;
     std::fill(Output.begin(), Output.end(), 0xdeadbeefu);
-    device.Dispatch(result, 1, 1, 1, {}, AddressOf(TableCode.data()));
+    device.Dispatch(result, 1, 1, 1, {}, AddressOf(code));
     device.WaitIdle();
     std::vector<std::uint32_t> red(Lanes);
     for (std::uint32_t lane = 0; lane < Lanes; ++lane) red[lane] = Output[lane * 4u];
@@ -281,6 +293,29 @@ void RunWritten(AgcDriver::VulkanDevice& device, const GuestBlock& block) {
     Expect(before, 1, 2, 0, "two dispatches of two variants, the narrow one written last");
 }
 
+void RunFetch(AgcDriver::VulkanDevice& device, const GuestBlock& block) {
+    Prepare(block);
+    SetRecord(block, 0, block.Texels(Sized), Wide);
+    SetRecord(block, 1, block.Texels(Sized), Narrow);
+    const auto result = Compile(device, block, FetchCode);
+    AgcDriver::GuestMemory::BumpCollectEpoch();
+    std::vector<std::uint32_t> texels(Lanes);
+    for (std::uint32_t lane = 0; lane < Lanes; ++lane) texels[lane] = std::bit_cast<std::uint32_t>(block.Texels(Sized)[lane]);
+    Require(Dispatch(device, result, 0, FetchCode.data()) == texels, "image table variants: a texel fetch from the largest variant read the wrong texels");
+    Require(Dispatch(device, result, 1, FetchCode.data()) == texels, "image table variants: a texel fetch from a borrowing entry did not read the texels of the texture it borrows, past its own width");
+}
+
+void RunSize(AgcDriver::VulkanDevice& device, const GuestBlock& block) {
+    Prepare(block);
+    SetRecord(block, 0, block.Texels(Sized), Wide);
+    SetRecord(block, 1, block.Texels(Sized), Narrow);
+    const auto result = Compile(device, block, SizeCode);
+    AgcDriver::GuestMemory::BumpCollectEpoch();
+    Require(Dispatch(device, result, 5, SizeCode.data()) == std::vector<std::uint32_t>(Lanes, Wide), "image table variants: an entry outside the family did not report its own width");
+    Require(Dispatch(device, result, 0, SizeCode.data()) == std::vector<std::uint32_t>(Lanes, Wide), "image table variants: the largest variant did not report its own width");
+    Require(Dispatch(device, result, 1, SizeCode.data()) == std::vector<std::uint32_t>(Lanes, Wide), "image table variants: a borrowing entry did not report the width of the texture it borrows");
+}
+
 void RunDepth(AgcDriver::VulkanDevice& device, const GuestBlock& block) {
     Prepare(block);
     SetRecord(block, 0, block.Texels(Depth), Wide);
@@ -317,6 +352,8 @@ void RunRejected(AgcDriver::VulkanDevice& device, const GuestBlock& block) {
 void RunTests(AgcDriver::VulkanDevice& device, const GuestBlock& block) {
     RunLargest(device, block);
     RunWritten(device, block);
+    RunFetch(device, block);
+    RunSize(device, block);
     RunDepth(device, block);
     RunRejected(device, block);
 }
