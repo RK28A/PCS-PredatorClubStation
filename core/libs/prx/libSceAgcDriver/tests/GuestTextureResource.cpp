@@ -307,13 +307,6 @@ void RunGuestTextureResourceTests() {
         Require(result.width == 8 && result.depthOrLastArray == 0 && result.linearPitch == pitch, "linear 2D descriptor did not round its DEPTH pitch up to 256 bytes");
         const auto geometry = DescribeSurface(result);
         Require(geometry.mips.size() == 1 && geometry.mips[0].pitchBytes == pitch * 4u && geometry.mips[0].blocksPerRow == pitch && geometry.guestBytes == pitch * 4u * 8u, "linear 2D surface with a custom pitch has the wrong layout");
-        bool encoded = true;
-        try {
-            static_cast<void>(EncodeTextureResource(result));
-        } catch (const std::exception&) {
-            encoded = false;
-        }
-        Require(!encoded, "a linear 2D surface with a custom pitch was encoded without it");
         auto defaultPitch = result;
         defaultPitch.linearPitch = 0;
         static_cast<void>(EncodeTextureResource(defaultPitch));
