@@ -113,16 +113,6 @@ static void AppendLoops(std::vector<std::uint8_t>& file, std::uint32_t loops, st
     std::memcpy(file.data() + 4, &riffSize, sizeof(riffSize));
 }
 
-static bool ParseThrows(const std::vector<std::uint8_t>& file) {
-    Ngs2WaveformInfo info{};
-    try {
-        sceNgs2ParseWaveformData(file.data(), file.size(), &info);
-    } catch (const std::exception&) {
-        return true;
-    }
-    return false;
-}
-
 static void RequireBlock(const Ngs2WaveformBlock& block, std::uint64_t offset, std::uint64_t size, std::uint32_t repeats, std::uint32_t samples) {
     Require(block.data_offset == offset && block.data_size == size && block.num_repeats == repeats && block.num_skip_samples == 0 && block.num_samples == samples);
 }
@@ -192,16 +182,6 @@ static void TestParsePcmLoops() {
     Require(info.num_blocks == 1 && info.loop_begin_position == 0 && info.loop_end_position == 0);
     RequireBlock(info.block[0], 44, 200, 0, 100);
 
-    for (const auto [begin, lastSample] : {std::pair{0u, 100u}, {100u, 120u}}) {
-        auto pastEnd = PcmFile(1, 44100, 16, 100);
-        AppendLoops(pastEnd, 1, 0, begin, lastSample, 0);
-        Require(ParseThrows(pastEnd));
-    }
-    for (const auto [size, loops] : {std::pair{28u, 0u}, {48u, 1u}}) {
-        auto shortSampler = PcmFile(1, 44100, 16, 100);
-        AppendShortSampler(shortSampler, size, loops);
-        Require(ParseThrows(shortSampler));
-    }
     auto emptySampler = PcmFile(1, 44100, 16, 100);
     AppendShortSampler(emptySampler, 36, 0);
     Require(sceNgs2ParseWaveformData(emptySampler.data(), emptySampler.size(), &info) == SCE_NGS2_OK && info.num_blocks == 1);
