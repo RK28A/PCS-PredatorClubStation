@@ -1,21 +1,8 @@
-#include "SceTypes.hpp"
+#include "prx/libkernel/include/Api.hpp"
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <initializer_list>
-
-extern "C" {
-int APS5_VABI scePthreadCreate(Pthread* thread, const PthreadAttr* attr, PthreadEntry entry, void* arg, const char* name);
-int APS5_VABI scePthreadJoin(Pthread thread, void** retval);
-int APS5_VABI scePthreadAttrInit(PthreadAttr* attr);
-int APS5_VABI scePthreadAttrDestroy(PthreadAttr* attr);
-int APS5_VABI scePthreadAttrGet(Pthread thread, PthreadAttr* attr);
-int APS5_VABI scePthreadAttrSetstacksize(PthreadAttr* attr, std::size_t stackSize);
-int APS5_VABI scePthreadAttrGetstack(const PthreadAttr* attr, void** stackAddress, std::size_t* stackSize);
-Pthread APS5_VABI scePthreadSelf();
-int APS5_VABI sceKernelIsStack(void* addr, void** start, void** end);
-int APS5_VABI mprotect_nid_postfix(void* address, std::size_t length, int protection) noexcept;
-}
 
 static constexpr int SCE_OK = 0;
 static constexpr std::uintptr_t GUEST_PAGE = 0x4000;
