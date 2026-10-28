@@ -27,7 +27,7 @@ def windows_runtime(build):
                     found = shutil.which(compiler)
                     if not found:
                         raise RuntimeError(f"CMAKE_CXX_COMPILER {compiler} in {cache} is not on PATH")
-                    compiler = found
+                    compiler = os.path.abspath(found)
                 return Path(compiler).parent
     raise RuntimeError(f"CMAKE_CXX_COMPILER is not configured in {cache}")
 

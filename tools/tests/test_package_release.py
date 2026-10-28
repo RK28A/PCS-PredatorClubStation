@@ -139,6 +139,8 @@ class ReleasePackageTests(unittest.TestCase):
         with patch.object(package_release.shutil, "which", return_value=str(compiler)) as which:
             self.assertEqual(package_release.windows_runtime(self.build), compiler.parent)
         which.assert_called_once_with("g++")
+        with patch.object(package_release.shutil, "which", return_value=os.path.join(".", "g++.exe")):
+            self.assertEqual(package_release.windows_runtime(self.build), Path.cwd())
         with patch.object(package_release.shutil, "which", return_value=None):
             with self.assertRaisesRegex(RuntimeError, "not on PATH"):
                 package_release.windows_runtime(self.build)
