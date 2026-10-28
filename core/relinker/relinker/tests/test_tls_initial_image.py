@@ -42,6 +42,7 @@ def image(guest, kind, windows=False):
     if kind in ("partial-zero", "partial-nonzero"):
         struct.pack_into("<Q", data, load_header + 32, tls_offset - load_offset + 4)
         data[tls_offset:tls_offset + 4] = b"\x2a\x01\x02\x03"
+        data[tls_offset + 4:tls_offset + 8] = b"\xff" * 4
         data[alternate_offset:alternate_offset + 8] = b"\x2a\x01\x02\x03\0\0\0\0"
         if kind == "partial-nonzero":
             data[alternate_offset + 7] = 1
