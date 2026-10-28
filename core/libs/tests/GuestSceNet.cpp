@@ -818,10 +818,14 @@ static void CheckConnectTimeoutExpiry() {
             return sceNetConnect(client, address.data(), address.size());
         });
         Require(attempt.wait_for(std::chrono::seconds(1)) == std::future_status::ready);
+        int result = -1;
         try {
-            Require(attempt.get() == 0);
-            queued.push_back(client);
+            result = attempt.get();
         } catch (const std::runtime_error&) {
+        }
+        if (result == 0) {
+            queued.push_back(client);
+        } else {
             waited = std::chrono::steady_clock::now() - start;
             pending = client;
         }
