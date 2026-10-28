@@ -267,12 +267,18 @@ def export_lines(exports, thread_local, namer):
     return lines
 
 
+def same_file(left, right):
+    return left.resolve() == right.resolve() or (left.exists() and right.exists() and left.samefile(right))
+
+
 def annotate(module_path, prefix, namer):
     source = Path(module_path)
-    for suffix in (".imports.txt", ".exports.txt", ".asm"):
-        output = Path(prefix + suffix)
-        if output.resolve() == source.resolve() or (output.exists() and source.exists() and output.samefile(source)):
+    outputs = [Path(prefix + suffix) for suffix in (".imports.txt", ".exports.txt", ".asm")]
+    for index, output in enumerate(outputs):
+        if same_file(output, source):
             raise ModuleError(f"annotation output must be separate from the input module: {output}")
+        if any(same_file(output, previous) for previous in outputs[:index]):
+            raise ModuleError(f"annotation outputs must name different files: {output}")
     module = Module(Path(module_path).read_bytes())
     slots = module.imports()
     exports, thread_local = module.exports()

@@ -323,5 +323,71 @@ class InputProtectionTests(unittest.TestCase):
             self.assertEqual(module.read_bytes(), original)
 
 
+class OutputProtectionTests(unittest.TestCase):
+    def test_hardlinked_reports_are_rejected_before_any_write(self):
+        suffixes = (".imports.txt", ".exports.txt", ".asm")
+        for left, right in ((0, 1), (0, 2), (1, 2)):
+            with self.subTest(left=suffixes[left], right=suffixes[right]), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                module = root / "input.prx"
+                original = build_module()
+                module.write_bytes(original)
+                outputs = [root / ("report" + suffix) for suffix in suffixes]
+                outputs[left].write_bytes(b"previous linked reports")
+                os.link(outputs[left], outputs[right])
+                outputs[3 - left - right].write_bytes(b"previous independent report")
+                previous = [path.read_bytes() for path in outputs]
+                with self.assertRaisesRegex(annotate_module.ModuleError, "outputs must name different files"):
+                    annotate_module.annotate(str(module), str(root / "report"), annotate_module.Namer({}))
+                self.assertEqual(module.read_bytes(), original)
+                self.assertEqual([path.read_bytes() for path in outputs], previous)
+
+    def test_dangling_symlinked_reports_are_rejected_before_any_write(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            module = root / "input.prx"
+            original = build_module()
+            module.write_bytes(original)
+            imports = root / "report.imports.txt"
+            exports = root / "report.exports.txt"
+            try:
+                imports.symlink_to(exports)
+            except OSError as error:
+                if os.name == "nt" and getattr(error, "winerror", None) == 1314:
+                    self.skipTest("Windows symbolic-link privileges unavailable")
+                raise
+            assembly = root / "report.asm"
+            assembly.write_bytes(b"previous disassembly")
+            with self.assertRaisesRegex(annotate_module.ModuleError, "outputs must name different files"):
+                annotate_module.annotate(str(module), str(root / "report"), annotate_module.Namer({}))
+            self.assertEqual(module.read_bytes(), original)
+            self.assertTrue(imports.is_symlink())
+            self.assertFalse(exports.exists())
+            self.assertEqual(assembly.read_bytes(), b"previous disassembly")
+
+    def test_cli_rejects_report_alias_without_success_output(self):
+        if annotate_module.gnu_objdump() is None:
+            self.skipTest("GNU objdump unavailable")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            module = root / "input.prx"
+            original = build_module()
+            module.write_bytes(original)
+            imports = root / "report.imports.txt"
+            imports.write_bytes(b"previous reports")
+            exports = root / "report.exports.txt"
+            os.link(imports, exports)
+            result = subprocess.run([sys.executable, annotate_module.__file__, str(module), "--out", str(root / "report"), "--no-names"],
+                                    capture_output=True, text=True, timeout=10)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("outputs must name different files", result.stderr)
+            self.assertNotIn("Traceback", result.stderr)
+            self.assertEqual(result.stdout, "")
+            self.assertEqual(module.read_bytes(), original)
+            self.assertEqual(imports.read_bytes(), b"previous reports")
+            self.assertEqual(exports.read_bytes(), b"previous reports")
+            self.assertFalse((root / "report.asm").exists())
+
+
 if __name__ == "__main__":
     unittest.main()
