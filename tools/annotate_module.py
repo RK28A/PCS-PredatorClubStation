@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import os
 import re
 import shutil
 import struct
@@ -267,8 +268,27 @@ def export_lines(exports, thread_local, namer):
     return lines
 
 
+def link_target(text):
+    if os.name != "nt":
+        return text
+    if text.startswith("\\\\?\\UNC\\"):
+        return "\\\\" + text[8:]
+    if text.startswith("\\\\?\\"):
+        return text[4:]
+    return text
+
+
+def resolved_path(path):
+    for _ in range(40):
+        if not path.is_symlink():
+            break
+        target = Path(link_target(os.readlink(path)))
+        path = target if target.is_absolute() else path.parent / target
+    return path.resolve()
+
+
 def same_file(left, right):
-    return left.resolve() == right.resolve() or (left.exists() and right.exists() and left.samefile(right))
+    return resolved_path(left) == resolved_path(right) or (left.exists() and right.exists() and left.samefile(right))
 
 
 def annotate(module_path, prefix, namer):

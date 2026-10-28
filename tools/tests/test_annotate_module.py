@@ -324,6 +324,52 @@ class InputProtectionTests(unittest.TestCase):
 
 
 class OutputProtectionTests(unittest.TestCase):
+    def test_windows_readlink_target_prefixes(self):
+        targets = (("\\\\?\\C:\\reports\\exports.txt", "C:\\reports\\exports.txt"),
+                   ("\\\\?\\UNC\\server\\reports\\exports.txt", "\\\\server\\reports\\exports.txt"),
+                   ("report.exports.txt", "report.exports.txt"))
+        for target, expected in targets:
+            with self.subTest(target=target), mock.patch.object(os, "name", "nt"):
+                self.assertEqual(annotate_module.link_target(target), expected)
+            with self.subTest(posix_target=target), mock.patch.object(os, "name", "posix"):
+                self.assertEqual(annotate_module.link_target(target), target)
+
+    def test_dangling_report_aliases_with_nonfollowing_resolve(self):
+        for shape in ("relative", "absolute", "chained", "unrelated"):
+            with self.subTest(shape=shape), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory).resolve()
+                module = root / "input.prx"
+                original = build_module()
+                module.write_bytes(original)
+                imports = root / "report.imports.txt"
+                exports = root / "report.exports.txt"
+                assembly = root / "report.asm"
+                assembly.write_bytes(b"previous disassembly")
+                target = root / "unrelated.txt" if shape == "unrelated" else exports
+                links = {imports: str(target) if shape == "absolute" else target.name}
+                if shape == "chained":
+                    links = {imports: "intermediate", root / "intermediate": exports.name}
+                resolve = Path.resolve
+                is_symlink = Path.is_symlink
+                readlink = os.readlink
+                def nonfollowing_resolve(path, *args, **kwargs):
+                    return path.absolute() if path in links else resolve(path, *args, **kwargs)
+                def simulated_symlink(path):
+                    return path in links or is_symlink(path)
+                def simulated_readlink(path):
+                    return links[path] if path in links else readlink(path)
+                with mock.patch.object(Path, "resolve", nonfollowing_resolve), \
+                     mock.patch.object(Path, "is_symlink", simulated_symlink), \
+                     mock.patch.object(os, "readlink", simulated_readlink):
+                    if shape == "unrelated":
+                        self.assertFalse(annotate_module.same_file(imports, exports))
+                    else:
+                        with self.assertRaisesRegex(annotate_module.ModuleError, "outputs must name different files"):
+                            annotate_module.annotate(str(module), str(root / "report"), annotate_module.Namer({}))
+                self.assertEqual(module.read_bytes(), original)
+                self.assertEqual(assembly.read_bytes(), b"previous disassembly")
+                self.assertFalse(exports.exists())
+
     def test_hardlinked_reports_are_rejected_before_any_write(self):
         suffixes = (".imports.txt", ".exports.txt", ".asm")
         for left, right in ((0, 1), (0, 2), (1, 2)):
