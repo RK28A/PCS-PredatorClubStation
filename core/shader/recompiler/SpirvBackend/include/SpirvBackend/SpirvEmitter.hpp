@@ -28,6 +28,7 @@ struct SpirvTargetOptions {
     bool float16DenormPreserve = false;
     bool spannedWaves = false;
     bool robustBufferAccess2 = false;
+    bool exactRobustLoads = false;
     bool float32FlushToZero = false;
     bool float32DenormPreserve = false;
     bool fusedExactArithmetic = false;
@@ -41,6 +42,8 @@ struct SpirvTargetOptions {
     bool waveLdsMemoryBarriers = false;
     bool largePixelFunctionLdsBuffer = false;
     std::uint32_t pixelFunctionStorageDwords = 4096u;
+    bool deviceScopeLdsMemoryBarriers = false;
+    bool ldsLockFences = false;
 };
 
 struct SpirvEmitInfo {
