@@ -1,4 +1,5 @@
-#include "prx/libc/include/general/VabiMacros.hpp"
+#include "prx/libSceLibcInternal/include/Api.hpp"
+#include "prx/libkernel/include/Api.hpp"
 #include <array>
 #include <bit>
 #include <cerrno>
@@ -6,11 +7,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-
-extern "C" {
-int APS5_VABI sigblock_nid_postfix(int);
-int APS5_VABI sigsetmask_nid_postfix(int);
-}
 
 namespace {
 

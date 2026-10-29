@@ -1,8 +1,7 @@
-#include "prx/libc/include/general/VabiMacros.hpp"
+#include "prx/libSceLibcInternal/include/Api.hpp"
+#include "prx/libkernel/include/Api.hpp"
 #include <bit>
 #include <cstdint>
-
-extern "C" int APS5_VABI sigprocmask_nid_postfix(int how, const void* set, void* previousSet);
 
 namespace {
 

@@ -1,4 +1,6 @@
-#include "prx/libc/include/general/VabiMacros.hpp"
+#include "prx/libSceLibcInternal/include/Api.hpp"
+#include "prx/libkernel/include/Api.hpp"
+#include "prx/libc/include/Api.hpp"
 #include <array>
 #include <bit>
 #include <csignal>
@@ -8,16 +10,6 @@
 #include <limits>
 
 using Handler = void (APS5_VABI *)(int);
-
-extern "C" {
-int APS5_VABI sigblock_nid_postfix(int);
-int APS5_VABI sigsetmask_nid_postfix(int);
-int APS5_VABI sigprocmask_nid_postfix(int, const void*, void*);
-int APS5_VABI sigpending_nid_postfix(void*);
-Handler APS5_VABI signal_nid_postfix(int, Handler);
-int APS5_VABI raise_nid_postfix(int);
-int* APS5_VABI __error_nid_postfix();
-}
 
 namespace {
 
@@ -70,10 +62,10 @@ int main() {
     Require(previous != reinterpret_cast<Handler>(std::numeric_limits<std::uintptr_t>::max()), "cannot install the signal handler");
     Require(sigblock_nid_postfix(userSignal) == 0, "cannot block SIGUSR1");
     Require(raise_nid_postfix(30) == 0 && received == 0, "a blocked signal was delivered");
-    SignalSet pending{};
-    Require(sigpending_nid_postfix(pending.data()) == 0 && (pending[0] & userSignal) != 0, "a blocked signal was not queued");
+    GuestSignalSet pending{};
+    Require(sigpending_nid_postfix(&pending) == 0 && (pending.bits[0] & userSignal) != 0, "a blocked signal was not queued");
     Require(sigsetmask_nid_postfix(0) == static_cast<int>(userSignal) && received == 30, "clearing the mask did not deliver SIGUSR1");
-    Require(sigpending_nid_postfix(pending.data()) == 0 && (pending[0] & userSignal) == 0, "the delivered signal remained pending");
+    Require(sigpending_nid_postfix(&pending) == 0 && (pending.bits[0] & userSignal) == 0, "the delivered signal remained pending");
     Require(signal_nid_postfix(30, previous) == Receive, "cannot restore the signal handler");
     Require(sigprocmask_nid_postfix(3, original.data(), nullptr) == 0, "cannot restore the original mask");
 }
