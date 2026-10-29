@@ -208,7 +208,7 @@ int APS5_VABI sceKernelWriteRemapIntoPrtCommand(std::uint32_t* dst, std::uint64_
 int APS5_VABI sceKernelAllocateDirectMemory(int64_t searchStart, int64_t searchEnd, size_t len, size_t alignment, int memoryType, int64_t* physAddrOut);
 int APS5_VABI sceKernelAllocateMainDirectMemory(size_t len, size_t alignment, int memoryType, int64_t* physAddrOut);
 int APS5_VABI sceKernelAllocateDirectMemoryForApp(int64_t searchStart, int64_t searchEnd, size_t len, size_t alignment, int memoryType, int64_t* physAddrOut);
-int APS5_VABI sceKernelProtectDirectMemoryForPID(void);
+int APS5_VABI sceKernelProtectDirectMemoryForPID(int64_t offset, size_t len, int prot, int pid);
 int APS5_VABI sceKernelAvailableDirectMemorySize(int64_t searchStart, int64_t searchEnd, size_t alignment, int64_t* physAddrOut, size_t* sizeOut);
 int APS5_VABI sceKernelDirectMemoryQuery(int64_t offset, int flags, void* info, size_t infoSize);
 int APS5_VABI sceKernelGetDirectMemoryType(int64_t offset, int* memoryType, int64_t* start, int64_t* end);
