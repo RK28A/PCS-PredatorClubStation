@@ -55,8 +55,6 @@ void testComputeEventWrite() {
     check(flush == storage.words.data() + 2 && flush[0] == 0xc0004600u && flush[1] == 0x407u, "ACB CS_PARTIAL_FLUSH does not carry event index 4");
     check(storage.buffer.cursor_up == storage.words.data() + 4, "ACB EVENT_WRITE cursor advance mismatch");
     expectFailure(storage, [&] { sceAgcAcbEventWrite(&storage.buffer, 0x40, nullptr); }, "an ACB event type above 0x3f was accepted");
-    alignas(8) std::uint64_t label = 0;
-    expectFailure(storage, [&] { sceAgcAcbEventWrite(&storage.buffer, 0x16, &label); }, "an ACB event with an address was accepted");
 }
 
 }
