@@ -1,14 +1,8 @@
-#include "prx/libc/include/general/VabiMacros.hpp"
+#include "prx/libSceAppInstUtil/include/Api.hpp"
 
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
-
-extern "C" {
-int APS5_VABI sceAppInstUtilInitialize(void);
-int APS5_VABI sceAppInstUtilTerminate(void);
-int APS5_VABI sceAppInstUtilAppExists(const char* titleId, std::int32_t* exists);
-}
 
 namespace {
 
