@@ -75,6 +75,8 @@ bool GuestArenaWriteSharedBacking_nid_no_patch(std::uintptr_t address, const voi
 bool GuestArenaSharedBacking_nid_postfix(std::uintptr_t address, std::size_t bytes, int* file, std::uint64_t* offset);
 void GuestArenaSetSharedBackingRuns_nid_postfix(SharedBackingRunsResolver resolver);
 bool GuestArenaSharedBackingRuns_nid_postfix(std::uintptr_t address, std::size_t bytes, int* file, SharedBackingRun* runs, std::size_t capacity, std::size_t* count);
+bool GuestArenaOverlapsHostRegion_nid_no_patch(std::uintptr_t address, std::size_t bytes);
+void GuestArenaReleaseHostRegion_nid_no_patch(const void* pointer, std::size_t bytes);
 #endif
 bool GuestArenaBeginHostWrite_nid_postfix(void* pointer, std::size_t bytes);
 void GuestArenaEndHostWrite_nid_postfix(void* pointer, std::size_t bytes);
