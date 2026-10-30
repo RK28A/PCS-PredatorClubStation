@@ -22,6 +22,7 @@
 #endif
 #include <windows.h>
 #else
+#include <dlfcn.h>
 #include <sys/mman.h>
 #endif
 #include <array>
@@ -266,6 +267,26 @@ std::array<std::uint32_t, 2> AddressWords(const Block& block) {
     return {static_cast<std::uint32_t>(address), static_cast<std::uint32_t>(address >> 32u)};
 }
 
+void KeepVulkanDriversLoaded() {
+#if defined(__GLIBC__)
+    static const VkInstance instance = [] {
+        VkInstance created = VK_NULL_HANDLE;
+        void* loader = dlopen("libvulkan.so.1", RTLD_NOW | RTLD_LOCAL);
+        if (loader == nullptr) return created;
+        const auto instanceProc = reinterpret_cast<PFN_vkGetInstanceProcAddr>(dlsym(loader, "vkGetInstanceProcAddr"));
+        const auto create = instanceProc != nullptr ? reinterpret_cast<PFN_vkCreateInstance>(instanceProc(VK_NULL_HANDLE, "vkCreateInstance")) : nullptr;
+        if (create == nullptr) return created;
+        VkApplicationInfo application{VK_STRUCTURE_TYPE_APPLICATION_INFO};
+        application.apiVersion = VK_API_VERSION_1_1;
+        VkInstanceCreateInfo info{VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO};
+        info.pApplicationInfo = &application;
+        if (create(&info, nullptr, &created) != VK_SUCCESS) created = VK_NULL_HANDLE;
+        return created;
+    }();
+    static_cast<void>(instance);
+#endif
+}
+
 void SetEnvironment(const char* name, const std::string& value) {
 #ifdef _WIN32
     _putenv_s(name, value.c_str());
@@ -344,6 +365,36 @@ void JournalTests() {
         const auto final = Snapshot();
         Require(final.journal.recordedGraphics == 1 && final.journal.recordedCompute == 1 && final.journal.recordedModules == 3, "the second run recorded pipelines the journal already held");
     }
+}
+
+void HeldModuleTests() {
+    using namespace NarrowConstantStoreFixture;
+    constexpr std::uint32_t programs = 16;
+    Block compute(BlockBytes);
+    const auto words = AddressWords(compute);
+    std::vector<std::vector<std::uint32_t>> codes;
+    for (std::uint32_t salt = 1; salt <= programs; ++salt) codes.push_back(ComputeCode(salt));
+    {
+        const auto device = OpenVulkanTestDevice();
+        Require(device != nullptr, "no device to record the compute programs");
+        device->WaitForPipelineJournalReplay();
+        std::vector<ShaderRecompiler::RecompileResult> results;
+        for (const auto& code : codes) results.push_back(CompileCompute(*device, code, words, 32));
+        for (std::size_t index = 0; index < results.size(); ++index) device->Dispatch(results[index], 1, 1, 1, {}, reinterpret_cast<std::uintptr_t>(codes[index].data()));
+        device->WaitIdle();
+        AgcDriver::Graphics::FlushPipelineJournal();
+    }
+    SetEnvironment("APS5_PIPELINE_JOURNAL_THREADS", "1");
+    const auto before = Snapshot();
+    const auto device = OpenVulkanTestDevice();
+    Require(device != nullptr, "no device to replay the compute programs");
+    device->WaitForPipelineJournalReplay();
+    const auto replayed = Snapshot();
+    SetEnvironment("APS5_PIPELINE_JOURNAL_THREADS", "2");
+    Require(replayed.journal.loadedRecipes == programs + 2 && replayed.journal.loadedModules == programs + 3 && replayed.journal.droppedRecords == 0, "the journal does not hold the 16 compute programs beside the first two pipelines");
+    Require(replayed.journal.replayedCompute - before.journal.replayedCompute == programs + 1 && replayed.journal.replayedGraphics - before.journal.replayedGraphics == 1 && replayed.journal.replayRejected == before.journal.replayRejected && replayed.journal.replayFailed == before.journal.replayFailed, "the one-thread replay did not build every recorded pipeline");
+    const auto held = replayed.journal.replayHeldPeakBytes;
+    Require(held > 0 && held * 4 < replayed.journal.loadedBytes, "the one-thread replay held " + std::to_string(held) + " bytes of modules at once from a " + std::to_string(replayed.journal.loadedBytes) + "-byte journal");
 }
 
 // --benchmark [count]: `count` distinct compute programs, dispatched for the first time on three
@@ -682,6 +733,7 @@ int main(int argc, char** argv) {
                 std::filesystem::remove_all(directory, error);
             }
         } cleanup{directory};
+        KeepVulkanDriversLoaded();
         {
             const auto device = OpenVulkanTestDevice();
             if (!device) return VulkanTestSkipped;
@@ -696,6 +748,7 @@ int main(int argc, char** argv) {
         EvictionWatermarkTests();
         EvictionKeepsPendingModules();
         OversizedRecordKeepsTheJournal();
+        HeldModuleTests();
         std::puts("pipeline journal record and replay passed");
         return 0;
     } catch (const std::exception& error) {

@@ -1,3 +1,4 @@
+#include "prx/libSceAppInstUtil/include/Api.hpp"
 #include <cstdint>
 #include <cstddef>
 #include <cstring>
@@ -14,8 +15,6 @@ static bool g_serviceStarted = false;
 static void RequireStarted(const char* function) {
     if (!g_serviceStarted) throw std::runtime_error(std::string(function) + ": called before sceAppInstUtilInitialize");
 }
-
-struct AppInstallProgressInfo;
 
 extern "C" {
 
