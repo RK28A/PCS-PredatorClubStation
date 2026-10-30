@@ -1,9 +1,62 @@
+#include "prx/libSceEsvmEngine/include/Api.hpp"
 #include <cstdint>
 #include <cstddef>
 #include "SceTypes.hpp"
 #include "prx/libc/include/General.hpp"
 
 extern "C" {
+
+int APS5_VABI sceEsvmEngineAddDecoder2() {
+    NotImplemented_nid_no_patch(__func__);
+}
+
+int APS5_VABI sceEsvmEngineAppAudioSyncFlush() {
+    NotImplemented_nid_no_patch(__func__);
+}
+
+int APS5_VABI sceEsvmEngineGetMetrics() {
+    NotImplemented_nid_no_patch(__func__);
+}
+
+int APS5_VABI sceEsvmEngineGetVideoPlaybackQuality() {
+    NotImplemented_nid_no_patch(__func__);
+}
+
+int APS5_VABI sceEsvmEngineInitializeCdm() {
+    NotImplemented_nid_no_patch(__func__);
+}
+
+int APS5_VABI sceEsvmEngineMediaKeySessionDecryptAudioData() {
+    NotImplemented_nid_no_patch(__func__);
+}
+
+int APS5_VABI sceEsvmEngineMediaKeysDecryptAudioData() {
+    NotImplemented_nid_no_patch(__func__);
+}
+
+int APS5_VABI sceEsvmEngineMediaKeysSetAppParameter() {
+    NotImplemented_nid_no_patch(__func__);
+}
+
+int APS5_VABI sceEsvmEngineProcessAckResponse() {
+    NotImplemented_nid_no_patch(__func__);
+}
+
+int APS5_VABI sceEsvmEngineReleaseVideoFrame() {
+    NotImplemented_nid_no_patch(__func__);
+}
+
+int APS5_VABI sceEsvmEngineSetAudiblePlaybackRate() {
+    NotImplemented_nid_no_patch(__func__);
+}
+
+int APS5_VABI sceEsvmEngineSetMediaKeys() {
+    NotImplemented_nid_no_patch(__func__);
+}
+
+int APS5_VABI sceEsvmEngineSyncVideo() {
+    NotImplemented_nid_no_patch(__func__);
+}
 
 int APS5_VABI sceEsvmEngineDestroyMediaKeySystemAccess() {
     NotImplemented_nid_no_patch(__func__);
