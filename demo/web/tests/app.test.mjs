@@ -319,6 +319,10 @@ test("a visible error follows a language switch", async t => {
   assert.equal(document.documentElement.lang, "de");
   assert.equal(get("error").children[0].textContent, "Release-Informationen können nicht geladen werden (404). release.json wird während des Site-Builds erzeugt und fehlt deshalb, wenn demo/web direkt bereitgestellt wird.");
   get("locale").onclick();
+  assert.equal(document.documentElement.lang, "fr");
+  assert.equal(document.documentElement.dir, "ltr");
+  assert.equal(get("error").children[0].textContent, "Impossible de charger les informations de version (404). release.json est généré lors de la construction du site ; il est donc absent quand demo/web est servi directement.");
+  get("locale").onclick();
   assert.equal(document.documentElement.lang, "ar");
   assert.equal(document.documentElement.dir, "rtl");
   assert.match(get("error").children[0].textContent, /\p{Script=Arabic}.*404/u);
