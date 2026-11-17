@@ -5,6 +5,12 @@ if(CMAKE_HOST_APPLE AND NOT ANYPS5_RELINKER_ONLY)
 endif()
 project(Relinker CXX)
 
+get_property(anyps5MultiConfig GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
+if(NOT anyps5MultiConfig AND NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Debug, Release, RelWithDebInfo or MinSizeRel" FORCE)
+    message(STATUS "CMAKE_BUILD_TYPE is not set: building Release")
+endif()
+
 set(ANYPS5_TEST_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests")
 if(MINGW)
     enable_language(RC)
