@@ -47,7 +47,10 @@ test('translated diagnostics retain action tokens and unknown technical details'
     assert.equal(diagnostic('ar-EG', 'Unexpected diagnostic'), 'Unexpected diagnostic');
     assert.equal(diagnostic('sv', 'Unexpected diagnostic'), 'Unexpected diagnostic');
     assert.equal(diagnostic('ar-EG', 'Composition and dead keys are ambiguous. Select an SDL key from the list.'), 'زرار تركيب الحروف مش واضح في التسجيل. اختار زرار SDL من القائمة.');
-    assert.equal(diagnostic('fr', 'Cross: Unknown or empty KEY value.'), 'Cross: Unknown or empty KEY value.');
+    assert.equal(diagnostic('fr', 'Cross: Unknown or empty KEY value.'), 'Cross: Valeur KEY inconnue ou vide.');
+    assert.equal(diagnostic('fr', 'KEY:F controls Cross and Square (built-in).'), 'KEY:F contrôle Cross et Square (par défaut).');
+    assert.equal(diagnostic('fr', 'Unexpected diagnostic'), 'Unexpected diagnostic');
+    assert.equal(diagnostic('nl', 'Cross: Unknown or empty KEY value.'), 'Cross: Unknown or empty KEY value.');
 });
 
 test('capture diagnostics are fully translated', () => {
