@@ -66,9 +66,27 @@ Implemented definitions are also classified as behaviourally empty when their bo
 
 `--module NAME` limits the library totals to those directories under `core/libs/prx`. Repeat the flag to include several. A name that is not a directory is an error. Shader counts stay complete. A shared-source wrapper is included only when its own directory is named. `--json` prints the object written to `progress.json` on stdout, instead of the two summary lines. Either flag makes the output directory optional. Without them the directory is still required, and a run that names only the directory still writes the whole tree.
 
+## Function inventory
+
+[`tools/function_inventory.py`](../../tools/function_inventory.py) writes one row per function the library counts include, with `--csv <file>`, and the totals with `--json <file>`; `--module NAME` limits it as for `progress.py`. It uses the same scanner, so its totals equal the library counts above. Each row has:
+
+- `library`, `name` (without the `_nid_postfix`, `_nid_no_patch` and disambiguation suffixes), `symbol` (as defined) and `source`, the file of the definition;
+- `nid` and `nid_source`: the NID an `APS5_EXPORT("<nid>", ...)` gives it (`explicit`), otherwise the one computed from the name;
+- `result` and `parameters`, as the definition writes them, and `signature_known`: `no` for a function exported only by NID under an `Unknown` name, and for a pending function with an empty parameter list, which is how `tools/stubgen.py` writes a function whose parameters nobody has established. A pending function that really takes no parameters is also `no`; the scan cannot tell them apart;
+- `state`: `pending` (the body reaches `NotImplemented_nid_no_patch`), `inert` (the body only returns a constant or nothing, as the scanner's `inert_names`) or `implemented`;
+- `tests`: the number of sources under a `tests` directory of `core/libs` that contain the name. A count above zero shows a test names the function, not what the test checks;
+- `debt`: whether `docs/dev/debt/<library>.md` contains the name;
+- `category`, from the four columns above: `pending_unknown_name`, `pending`, `inert`, `implemented_documented_gap` (implemented and named in the debt file), `implemented_tested` (implemented, not in the debt file, named by a test) and `implemented_untested`.
+
+`reference`, `proprietary`, `console_needed` and `importance` are assigned per library from the tables at the top of the script, not per function: `reference` names the public sources a library's standard functions follow and stays empty for names that start with `sce`; `proprietary` marks libraries that front a network service, a peripheral, a licensed component or a console-internal facility; `console_needed` is `no` only for a function with a reference in a library that is not proprietary. They sort the rows for reading; they are not a review of each function.
+
+The inventory describes this repository. A console export no library declares is not in it, and `implemented` means only that the body does not reach the stub: whether a function behaves as on the console is what the tests and the [technical debt](TechnicalDebt.md) files record.
+
 ## Verification
 
 ```sh
+python3 tools/tests/test_function_inventory.py
+python3 tools/function_inventory.py --module libScePad --csv /tmp/anyps5-inventory.csv
 python3 tools/tests/test_progress.py
 python3 tools/tests/test_progress_prs.py
 python3 tools/tests/test_progress_open_pr_page.py
