@@ -169,6 +169,18 @@ SDL and FreeType settings forced by the root `CMakeLists.txt` cannot be overridd
 
 With `ANYPS5_USE_SYSTEM_DEPS=ON` those libraries come from the system (on Debian and Ubuntu: `libsdl2-dev`, `libfreetype-dev`, `libvulkan-dev`, `spirv-headers`, `glslang-dev`, `glslang-tools` and `spirv-tools`). A missing package, Vulkan-Headers older than 1.4.310 (the agc driver uses `VK_KHR_maintenance8`), or an SDL2 without the HIDAPI joystick driver (sdl2-compat over SDL3, or a build with HIDAPI disabled, which breaks the pad and disk-audio tests), fails the configure with an error and never falls back to the submodule. The forced SDL and FreeType settings from the root `CMakeLists.txt` do not apply with the flag ON: the system SDL2 comes with whatever its distribution enabled. The prx libraries are shared objects, so SDL2 is linked from the system as a shared library; the default build keeps its own static SDL2. `ffmpeg-core`, `libjpeg-turbo`, `stb`, `VulkanMemoryAllocator`, `LibAtrac9`, `ogg`, `vorbis`, `opus`, `libusb-cmake`, `mbedtls`, `vgmstream`, `zstd`, `ZArchive` and, on Windows, `mimalloc` always stay bundled and still need `git submodule update --init`.
 
+## Comparing the CPU time of two builds
+
+`tools/ctest_cpu_compare.py` runs the registered tests that `--regex` selects from two build directories and compares the user plus system CPU time of their processes. It is for a change that has no title to measure, such as a build option, where both directories hold the same tests:
+
+```sh
+python3 tools/ctest_cpu_compare.py --baseline build-main --candidate build-change --regex '^agc_driver_(batch_cap|scalar_sop1)$' --rounds 3 --json compare.json
+```
+
+Each round runs baseline, candidate, candidate, baseline, every test with the environment and working directory CTest gives it; paths under the baseline directory are replaced by the candidate's. A test that fails, times out or exits with the skip code 77 in either build is left out and named. The output is the median of the per-run totals for each build, the spread between its runs and the change in percent; `--json` also has the per-test medians. Not on Windows.
+
+The figure is the CPU time of those tests on that machine. GPU tests on lavapipe spend part of it in the software rasterizer, which is the same in both builds and dilutes the difference. It is not a frame rate: a pull request that claims a change in speed for a title still shows `tools/trace_digest.py` summaries, as [CONTRIBUTING](../../CONTRIBUTING.md) requires.
+
 ## HTTP locale tests
 
 The Linux HTTP URI locale regression needs an ISO-8859-1 locale. With tests enabled, CMake uses host `localedef` and installed locale sources to generate a private `en_US.ISO8859-1` under the HTTP build directory. This runs from the checked-out PR tree, including when CI dispatches the workflow from `main`, and changes no system locales. `-DANYPS5_HTTP_TEST_LOCALE_DIR=<directory>` overrides generation. Only `guest_http_uri_locale` receives the private directory through `LOCPATH`. If `localedef` or its source data is unavailable, configuration reports it and leaves the test to probe installed locales. Without an effective Latin-1 locale the test explicitly skips; the CI skip audit rejects that loss of coverage. Windows requires `.1252`.

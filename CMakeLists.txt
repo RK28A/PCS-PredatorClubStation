@@ -354,6 +354,11 @@ if(BUILD_TESTING)
         add_test(NAME function_inventory COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_function_inventory.py)
         set_tests_properties(function_inventory PROPERTIES TIMEOUT 20)
+        if(NOT WIN32)
+            add_test(NAME ctest_cpu_compare COMMAND ${Python3_EXECUTABLE}
+                ${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_ctest_cpu_compare.py)
+            set_tests_properties(ctest_cpu_compare PROPERTIES TIMEOUT 30)
+        endif()
         if(Python3_VERSION VERSION_GREATER_EQUAL 3.11)
             add_test(NAME tools_catalog_json COMMAND ${Python3_EXECUTABLE}
                 ${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_catalog_json.py)
