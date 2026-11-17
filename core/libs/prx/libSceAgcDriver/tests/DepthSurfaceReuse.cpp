@@ -436,6 +436,25 @@ void TestMultisampleDepthOwnership(Context context) {
     Require(imagesDestroyed == destroyed + 1u, "the last sampled view must release its native depth image exactly once");
 }
 
+void TestStencilShadowProbeIsRemembered(const Context& device) {
+    DepthTarget target{0x74000000, 0x74800000, {1280, 720}, VK_FORMAT_D32_SFLOAT_S8_UINT, 1.0f, 0};
+    target.samples = 4;
+    const auto remembered = [&] {
+        std::lock_guard lock(device.stencilShadowCopyProbes->mutex);
+        return device.stencilShadowCopyProbes->entries.size();
+    };
+    Require(remembered() == 0, "the stencil shadow probe fixture needs a device context without probe results");
+    for (int draw = 0; draw < 2; ++draw) {
+        Context perDraw = device;
+        perDraw.imageFormatProperties = sampledDepthProperties;
+        Require(DepthSurfaceView(perDraw, target) != VK_NULL_HANDLE, "a multisampled depth and stencil surface must bind through a copy of the device context");
+        ClearDepthSurfaces(perDraw.device);
+        Require(remembered() == 1, "a stencil shadow copy probe made through a copy of the device context must be remembered by the device context and not repeated");
+    }
+    std::lock_guard lock(device.stencilShadowCopyProbes->mutex);
+    device.stencilShadowCopyProbes->entries.clear();
+}
+
 void TestMultisampleStencilAliases(Context context) {
     context.imageFormatProperties = sampledDepthProperties;
     for (const auto format : {VK_FORMAT_D16_UNORM_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT, VK_FORMAT_D32_SFLOAT_S8_UINT}) {
@@ -897,6 +916,7 @@ void RunDepthSurfaceReuseTests() {
     TestD16StencilFallback(context);
     TestCopiedHtileProvesNoClear(context);
     TestFilledHtileAfterCopyClears(context);
+    TestStencilShadowProbeIsRemembered(context);
     TestMultisampleDepthOwnership(context);
     TestMultisampleStencilAliases(context);
     TestStencilUnormView(context);

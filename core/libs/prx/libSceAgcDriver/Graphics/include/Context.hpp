@@ -198,6 +198,11 @@ std::uint64_t& DeviceProcLookups();
 
 inline constexpr std::size_t EmptyBufferBytes = 16;
 
+struct StencilShadowCopyProbes {
+    std::mutex mutex;
+    std::vector<std::pair<std::pair<VkFormat, std::uint32_t>, bool>> entries;
+};
+
 struct Context {
     VkDevice device;
     VkPhysicalDevice physical;
@@ -225,7 +230,7 @@ struct Context {
     VkPipelineCache pipelineCache = VK_NULL_HANDLE;
     bool depthClamp = false;
     VkDeviceSize hostImportAlignment = 0;
-    mutable std::vector<std::pair<std::pair<VkFormat, std::uint32_t>, bool>> stencilShadowCopyProbes;
+    std::shared_ptr<StencilShadowCopyProbes> stencilShadowCopyProbes = std::make_shared<StencilShadowCopyProbes>();
     bool drawInputsInPlace = true;
     std::size_t drawInputsInPlaceBelow = 0;
     bool discreteGpu = false;

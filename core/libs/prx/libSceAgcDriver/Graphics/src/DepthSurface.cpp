@@ -917,10 +917,16 @@ bool ProbeStencilShadowCopy(const Context& context, VkFormat format, std::uint32
 
 bool StencilShadowCopyWorks(const Context& context, VkFormat format, std::uint32_t samples) {
     const std::pair key{format, samples};
-    const auto cached = std::find_if(context.stencilShadowCopyProbes.begin(), context.stencilShadowCopyProbes.end(), [&](const auto& entry) { return entry.first == key; });
-    if (cached != context.stencilShadowCopyProbes.end()) return cached->second;
+    auto& probes = *context.stencilShadowCopyProbes;
+    const auto find = [&] { return std::find_if(probes.entries.begin(), probes.entries.end(), [&](const auto& entry) { return entry.first == key; }); };
+    {
+        std::lock_guard lock(probes.mutex);
+        if (const auto cached = find(); cached != probes.entries.end()) return cached->second;
+    }
     const bool works = ProbeStencilShadowCopy(context, format, samples);
-    context.stencilShadowCopyProbes.emplace_back(key, works);
+    std::lock_guard lock(probes.mutex);
+    if (const auto cached = find(); cached != probes.entries.end()) return cached->second;
+    probes.entries.emplace_back(key, works);
     return works;
 }
 
