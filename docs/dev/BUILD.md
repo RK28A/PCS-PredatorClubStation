@@ -157,7 +157,7 @@ Build configuration parameters:
 
 | Flag                                   | Value                                                              |
 |----------------------------------------|--------------------------------------------------------------------|
-| `-DCMAKE_BUILD_TYPE=Release`           | `Debug`, `Release`, `RelWithDebInfo`, or `MinSizeRel`.             |
+| `-DCMAKE_BUILD_TYPE=Release`           | `Debug`, `Release`, `RelWithDebInfo`, or `MinSizeRel`. A single-configuration generator (Ninja, Makefiles) configured without it builds `Release` and says so; CMake alone would compile with no optimization flags. |
 | `-DCMAKE_C_COMPILER=gcc`               | C compiler name or absolute path.                                  |
 | `-DCMAKE_CXX_COMPILER=g++`             | C++ compiler name or absolute path.                                |
 | `-DCMAKE_C_COMPILER_LAUNCHER=ccache`   | Optional C compiler cache; requires `ccache`.                      |
